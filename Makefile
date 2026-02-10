@@ -27,6 +27,13 @@ $(call allow-override,PKG_CONFIG,pkg-config)
 $(call allow-override,LD_SO_CONF_PATH,/etc/ld.so.conf.d/)
 $(call allow-override,LDCONFIG,ldconfig)
 
+# Set compile option CFLAGS
+ifdef EXTRA_CFLAGS
+  CFLAGS ?= $(EXTRA_CFLAGS)
+else
+  CFLAGS ?= -g -Wall
+endif
+
 EXT = -std=gnu99
 INSTALL = install
 
@@ -36,6 +43,22 @@ INSTALL = install
 # Then the build tool can move it later.
 DESTDIR ?=
 DESTDIR_SQ = '$(subst ','\'',$(DESTDIR))'
+
+test-build = $(if $(shell sh -c 'echo "$(1)" | tee /tmp/t.c| \
+	$(CC) -o /dev/null -x c - > /dev/null 2>&1 && echo y'), $2)
+
+define BTF_LATEST_SOURCE
+#include <linux/btf.h>
+int main(void) { struct btf_enum64 e = {}; \
+		 return e.name_off + e.val_lo32 + e.val_hi32 + \
+			BTF_KIND_ENUM64; }
+endef
+
+BTF_OK := $(call test-build,$(BTF_LATEST_SOURCE),y)
+
+ifneq ($(strip $(BTF_OK)), y)
+CFLAGS += -DNO_BTF
+endif
 
 LP64 := $(shell echo __LP64__ | ${CC} ${CFLAGS} -E -x c - | tail -n 1)
 ifeq ($(LP64), 1)
@@ -122,13 +145,6 @@ EP_HEADERS_DIR = $(src)/include/traceevent
 INCLUDES = -I. -I $(srctree)/include -I $(EP_HEADERS_DIR) $(CONFIG_INCLUDES)
 
 export LIBTRACEEVENT_STATIC LIBTRACEEVENT_SHARED EP_HEADERS_DIR
-
-# Set compile option CFLAGS
-ifdef EXTRA_CFLAGS
-  CFLAGS := $(EXTRA_CFLAGS)
-else
-  CFLAGS := -g -Wall
-endif
 
 LIBS ?= -ldl
 export LIBS

@@ -8,7 +8,9 @@
 #include <stdlib.h>
 #include <stdbool.h>
 
+#ifndef NO_BTF
 #include <linux/btf.h>
+#endif
 
 #include "event-parse.h"
 #include "event-utils.h"
@@ -52,6 +54,7 @@ static const char *btf_name(struct tep_btf *btf, int off)
 /* List taken from the Linux kernel */
 static const char * const btf_kind_str[NR_BTF_KINDS] = {
 	[BTF_KIND_UNKN]		= "UNKNOWN",
+#ifndef NO_BTF
 	[BTF_KIND_INT]		= "INT",
 	[BTF_KIND_PTR]		= "PTR",
 	[BTF_KIND_ARRAY]	= "ARRAY",
@@ -71,6 +74,7 @@ static const char * const btf_kind_str[NR_BTF_KINDS] = {
 	[BTF_KIND_DECL_TAG]	= "DECL_TAG",
 	[BTF_KIND_TYPE_TAG]	= "TYPE_TAG",
 	[BTF_KIND_ENUM64]	= "ENUM64",
+#endif
 };
 
 static const char *btf_type_str(const struct btf_type *t)
@@ -111,6 +115,9 @@ static int add_func(struct tep_btf *btf, struct btf_type *type)
 
 static int btf_type_size(struct btf_type *type)
 {
+#ifdef NO_BTF
+	return -1;
+#else
 	int kind = BTF_INFO_KIND(type->info);
 	int size = sizeof(*type);
 
@@ -146,6 +153,7 @@ static int btf_type_size(struct btf_type *type)
 		return size;
 	}
 	return -1;
+#endif
 }
 
 static int cmp_funcs(const void *A, const void *B, void *data)
@@ -316,6 +324,7 @@ static struct btf_type *btf_skip_modifiers(struct tep_btf *btf, int id)
 {
 	struct btf_type *t = btf_get_type(btf, id);
 
+#ifndef NO_BTF
 	for (;;) {
 		switch (BTF_INFO_KIND(t->info)) {
 		case BTF_KIND_TYPEDEF:
@@ -329,6 +338,7 @@ static struct btf_type *btf_skip_modifiers(struct tep_btf *btf, int id)
 		}
 		break;
 	}
+#endif
 
 	return t;
 }
@@ -349,6 +359,7 @@ static void add_name(struct tep_btf *btf, struct btf_type *t,
 
 static void btf_add_type(struct tep_btf *btf, struct trace_seq *s, int id)
 {
+#ifndef NO_BTF
 	struct btf_type *t = btf_get_type(btf, id);
 	unsigned int encode;
 	int bits;
@@ -414,6 +425,7 @@ static void btf_add_type(struct tep_btf *btf, struct trace_seq *s, int id)
 		}
 		break;
 	}
+#endif
 }
 
 static void assign_arg(unsigned long long *arg, void *args, int size, int a)
@@ -481,6 +493,9 @@ static int init_btf_func(struct tep_btf *btf, struct trace_seq *s,
  */
 int tep_btf_list_args(struct tep_handle *tep, struct trace_seq *s, const char *func)
 {
+#ifdef NO_BTF
+	return -1;
+#else
 	struct tep_btf *btf = tep->btf;
 	struct btf_type *type = tep_btf_find_func(btf, func);
 	struct btf_param *param;
@@ -530,6 +545,7 @@ int tep_btf_list_args(struct tep_handle *tep, struct trace_seq *s, const char *f
 			trace_seq_printf(s, "%s", param_name);
 	}
 	return p;
+#endif
 }
 
 /**
@@ -553,6 +569,10 @@ int tep_btf_list_args(struct tep_handle *tep, struct trace_seq *s, const char *f
 int tep_btf_print_args(struct tep_handle *tep, struct trace_seq *s, void *args,
 		       int nmem, int size, const char *func)
 {
+#ifdef NO_BTF
+	tep_warning("BTF not supported. Args: ??? \n");
+	return -1;
+#else
 	struct tep_btf *btf = tep->btf;
 	struct btf_type *type = tep_btf_find_func(btf, func);
 	struct btf_param *param;
@@ -664,4 +684,5 @@ int tep_btf_print_args(struct tep_handle *tep, struct trace_seq *s, void *args,
 		}
 	}
 	return 0;
+#endif
 }
